@@ -57,10 +57,7 @@ class ModelGrapher(object):
         self.show_inherited = show_inherited
         self.show_operations = show_operations
         self.show_multiplicity_one = show_multiplicity_one
-        if name_mangler is not None:
-            self.renamer = name_mangler
-        else:
-            self.renamer = lambda obj: obj
+        self.renamer = name_mangler or (lambda obj: obj)
         self.style = self._calculate_style(style)
 
     @staticmethod
