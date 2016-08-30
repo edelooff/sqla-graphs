@@ -97,7 +97,11 @@ class ModelGrapher(object):
         argspec = list(getargspec(function))
         if argspec[0][0] == 'self':
             argspec[0].pop(0)
-        argspec[0] = map(self.renamer, argspec[0])
+        for index, content in enumerate(argspec):
+            if isinstance(content, (list, tuple)):
+                argspec[index] = map(self.renamer, content)
+            elif isinstance(content, str):
+                argspec[index] = self.renamer(content)
         return formatargspec(*argspec)
 
     @staticmethod
