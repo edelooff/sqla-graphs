@@ -18,6 +18,8 @@ NODE_TABLE_START = (
     '<FONT POINT-SIZE="{top_margin}"><BR ALIGN="LEFT" /></FONT>'
     '<FONT COLOR="{color}" POINT-SIZE="{fontsize}"><B>{title}</B></FONT>'
     '</TD></TR>')
+NODE_BLOCK_START = '<TR><TD><TABLE BORDER="0" CELLSPACING="0" CELLPADDING="1">'
+NODE_BLOCK_END = '</TABLE></TD></TR>'
 DEFAULT_STYLE = {
     'edge': {
         'arrowsize': 0.6,
@@ -40,6 +42,13 @@ DEFAULT_STYLE = {
         'color': '#FFFFFF',
         'fontsize': 10,
         'top_margin': 2}}
+
+
+def node_row(content):
+    """Renders a content row for a node table."""
+    if isinstance(content, (list, tuple)):
+        content = ''.join(content)
+    return '<TR><TD ALIGN="LEFT">{content}</TD></TR>'.format(content=content)
 
 
 class ModelGrapher(object):
@@ -108,26 +117,24 @@ class ModelGrapher(object):
 
         # Column attributes
         if self.show_attributes:
-            html.append('<TR><TD ALIGN="LEFT" BALIGN="LEFT">')
+            html.append(NODE_BLOCK_START)
             for column in mapper.columns:
                 if self.show_inherited or column.table is mapper.tables[0]:
-                    html.append(self._column_label(column))
-                    html.append('<BR/>')
-            html.append('</TD></TR>')
+                    html.append(node_row(self._column_label(column)))
+            html.append(NODE_BLOCK_END)
 
         # Model methods
         if self.show_operations:
             operations = filter(self.is_local_class_method(model), vars(model))
             if operations:
-                html.append('<TR><TD ALIGN="LEFT" BALIGN="LEFT">')
+                html.append(NODE_BLOCK_START)
                 for name in sorted(operations):
                     func = getattr(model, name)
+                    oper = [self.renamer(name), self._formatted_argspec(func)]
                     if not isinstance(func, MethodType):
-                        html.append('*')  # Non-instancemethod indicator
-                    html.append(self.renamer(name))
-                    html.append(self._formatted_argspec(func))
-                    html.append('<BR/>')
-                html.append('</TD></TR>')
+                        oper.insert(0, '*')  # Non-instancemethod indicator
+                    html.append(node_row(oper))
+                html.append(NODE_BLOCK_END)
         html.append('</TABLE>')
         return '<{}>'.format(''.join(html))
 
