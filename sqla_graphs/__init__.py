@@ -44,6 +44,23 @@ DEFAULT_STYLE = {
         'top_margin': 2}}
 
 
+def calculate_style(style):
+    def collapse(*keys):
+        result = {}
+        for key in keys:
+            result.update(DEFAULT_STYLE[key])
+            result.update(style.get(key, {}))
+        return result
+
+    style = style if style is not None else {}
+    return {
+        'edge': collapse('edge'),
+        'inheritance': collapse('edge', 'inheritance'),
+        'relationship': collapse('edge', 'relationship'),
+        'node': collapse('node'),
+        'node_table_header': collapse('node_table_header')}
+
+
 def node_row(content):
     """Renders a content row for a node table."""
     if isinstance(content, (list, tuple)):
@@ -73,23 +90,7 @@ class ModelGrapher(object):
         if graph_options is not None:
             self.graph_options.update(graph_options)
         self.renamer = name_mangler or (lambda obj: obj)
-        self.style = self._calculate_style(style)
-
-    @staticmethod
-    def _calculate_style(style):
-        def collapse(*keys):
-            result = {}
-            for key in keys:
-                result.update(DEFAULT_STYLE[key])
-                result.update(style.get(key, {}))
-            return result
-
-        style = style if style is not None else {}
-        return {
-            'inheritance': collapse('edge', 'inheritance'),
-            'relationship': collapse('edge', 'relationship'),
-            'node': collapse('node'),
-            'node_table_header': collapse('node_table_header')}
+        self.style = calculate_style(style)
 
     def _column_label(self, column):
         """Returns the column name with type if so configured."""
