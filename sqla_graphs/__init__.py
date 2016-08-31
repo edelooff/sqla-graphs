@@ -38,7 +38,7 @@ DEFAULT_STYLE = {
         'fontsize': 8,
         'shape': 'plaintext'},
     'node_table_header': {
-        'bgcolor': '#444444',
+        'bgcolor': '#707070',
         'color': '#FFFFFF',
         'fontsize': 10,
         'top_margin': 2}}
@@ -146,8 +146,7 @@ class ModelGrapher(object):
                         oper.insert(0, '*')  # Non-instancemethod indicator
                     html.append(node_row(oper))
                 html.append(NODE_BLOCK_END)
-        html.append('</TABLE>')
-        return '<{}>'.format(''.join(html))
+        return '<{}</TABLE>>'.format(''.join(html))
 
     def _multiplicity_indicator(self, prop):
         if prop.uselist:
