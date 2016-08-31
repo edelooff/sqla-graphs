@@ -52,6 +52,8 @@ def node_row(content):
 
 
 class ModelGrapher(object):
+    GRAPH_OPTIONS = {'mclimit': 1000}
+
     def __init__(
             self,
             show_attributes=True,
@@ -59,6 +61,7 @@ class ModelGrapher(object):
             show_inherited=True,
             show_operations=False,
             show_multiplicity_one=False,
+            graph_options=None,
             name_mangler=None,
             style=None):
         self.show_attributes = show_attributes
@@ -66,6 +69,9 @@ class ModelGrapher(object):
         self.show_inherited = show_inherited
         self.show_operations = show_operations
         self.show_multiplicity_one = show_multiplicity_one
+        self.graph_options = self.GRAPH_OPTIONS.copy()
+        if graph_options is not None:
+            self.graph_options.update(graph_options)
         self.renamer = name_mangler or (lambda obj: obj)
         self.style = self._calculate_style(style)
 
@@ -161,7 +167,7 @@ class ModelGrapher(object):
             self._multiplicity_indicator(rel), self.renamer(rel.key))
 
     def graph(self, mappers):
-        graph = Dot(mclimit=1000)
+        graph = Dot(**self.graph_options)
         relations = set()
 
         def class_name(obj):
