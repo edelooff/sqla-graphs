@@ -61,11 +61,12 @@ def calculate_style(style):
         'node_table_header': collapse('node_table_header')}
 
 
-def node_row(content):
+def node_row(content, port=''):
     """Renders a content row for a node table."""
     if isinstance(content, (list, tuple)):
         content = ''.join(content)
-    return '<TR><TD ALIGN="LEFT">{content}</TD></TR>'.format(content=content)
+    return '<TR><TD ALIGN="LEFT" PORT="{port}">{content}</TD></TR>'.format(
+        port=port, content=content)
 
 
 class ModelGrapher(object):
@@ -207,3 +208,91 @@ class ModelGrapher(object):
                 options['headlabel'] = self._relationship_label(prop)
             graph.add_edge(Edge(*between, **options))
         return graph
+
+
+class TableGrapher(object):
+    GRAPH_OPTIONS = {
+        'concentrate': 'true',
+        'mclimit': 1000,
+        'rankdir': 'TB'}
+
+    def __init__(
+            self,
+            show_datatypes=True,
+            show_indexes=True,
+            graph_options=None,
+            name_mangler=None,
+            style=None):
+        self.show_datatypes = show_datatypes
+        self.show_indexes = show_indexes
+        self.graph_options = self.GRAPH_OPTIONS.copy()
+        if graph_options is not None:
+            self.graph_options.update(graph_options)
+        self.renamer = name_mangler or (lambda obj: obj)
+        self.style = calculate_style(style)
+
+    def graph(self, tables, skip_tables=()):
+        graph = Dot(**self.graph_options)
+        for table in tables:
+            if table.name in skip_tables:
+                continue
+
+            graph.add_node(Node(
+                table.name,
+                label=self._table_label(table),
+                **self.style['node']))
+
+            for fk in table.foreign_keys:
+                fk_table = fk.column.table
+                if fk_table not in tables or fk_table.name in skip_tables:
+                    continue
+                is_single_parent = fk.parent.primary_key or fk.parent.unique
+                options = self.style['edge'].copy()
+                options['arrowtail'] = 'empty' if is_single_parent else 'crow'
+                options['dir'] = 'both'
+                if fk.parent.primary_key and fk.column.primary_key:
+                    # Inheritance relationship
+                    edge = fk_table.name, table.name
+                    options['arrowhead'] = 'none'
+                    options['tailport'] = fk.column.name
+                    options['headport'] = fk.parent.name
+                else:
+                    edge = table.name, fk_table.name
+                    options['arrowhead'] = 'odot'
+                    options['tailport'] = fk.parent.name
+                    options['headport'] = fk.column.name
+                graph.add_edge(Edge(*edge, **options))
+        return graph
+
+    def _table_label(self, table):
+        html = [NODE_TABLE_START.format(
+            title=self.renamer(table.name),
+            **self.style['node_table_header'])]
+
+        # Columns
+        html.append(NODE_BLOCK_START)
+        for col in table.columns:
+            html.append(node_row(self._format_column(col), port=col.name))
+        html.append(NODE_BLOCK_END)
+
+        # Indexes
+        if self.show_indexes and (table.indexes or table.primary_key):
+            html.append(NODE_BLOCK_START)
+            if table.primary_key:
+                html.append(node_row(self._format_index(
+                    'PRIMARY', table.primary_key.columns)))
+            for index in table.indexes:
+                html.append(node_row(self._format_index(
+                    'UNIQUE' if index.unique else 'INDEX', index.columns)))
+            html.append(NODE_BLOCK_END)
+        return '<{}</TABLE>>'.format(''.join(html))
+
+    def _format_column(self, col):
+        if self.show_datatypes:
+            return '{}: {}'.format(
+                *map(self.renamer, (col.name, str(col.type))))
+        return self.renamer(col.name)
+
+    def _format_index(self, idx_type, cols):
+        return '{} ({})'.format(
+            idx_type, ', '.join(self.renamer(col.name) for col in cols))
