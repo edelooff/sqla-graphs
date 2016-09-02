@@ -113,77 +113,6 @@ class ModelGrapher(Grapher):
         self.show_operations = show_operations
         self.show_multiplicity_one = show_multiplicity_one
 
-    def quote(self, mapper):
-        """Returns the quoted model name."""
-        return super(ModelGrapher, self).quote(mapper.class_.__name__)
-
-    def _column_label(self, column):
-        """Returns the column name with type if so configured."""
-        if self.show_datatypes:
-            return '{}: {}'.format(
-                *map(self.renamer, (column.name, type(column.type).__name__)))
-        return self.renamer(column.name)
-
-    def _formatted_argspec(self, function):
-        """Returns a formatted argument spec exluding a method's 'self'."""
-        argspec = list(getargspec(function))
-        if argspec[0][0] == 'self':
-            argspec[0].pop(0)
-        for index, content in enumerate(argspec):
-            if isinstance(content, (list, tuple)):
-                argspec[index] = map(self.renamer, content)
-            elif isinstance(content, str):
-                argspec[index] = self.renamer(content)
-        return formatargspec(*argspec)
-
-    @staticmethod
-    def is_local_class_method(class_):
-        """Test whether attr name is a method defined on the provided class."""
-        def _checker(attribute):
-            obj = getattr(class_, attribute)
-            return (isinstance(obj, (FunctionType, MethodType)) and
-                    obj.__module__ is class_.__module__)
-        return _checker
-
-    def _model_columns(self, mapper):
-        if self.show_attributes:
-            yield NODE_BLOCK_START
-            for column in mapper.columns:
-                if self.show_inherited or column.table is mapper.tables[0]:
-                    yield self.node_row(self._column_label(column))
-            yield NODE_BLOCK_END
-
-    def _model_operations(self, mapper):
-        model = mapper.class_
-        operations = filter(self.is_local_class_method(model), vars(model))
-        if operations and self.show_operations:
-            yield NODE_BLOCK_START
-            for name in sorted(operations):
-                func = getattr(model, name)
-                oper = [self.renamer(name), self._formatted_argspec(func)]
-                if not isinstance(func, MethodType):
-                    oper.insert(0, '*')  # Non-instancemethod indicator
-                yield self.node_row(oper)
-            yield NODE_BLOCK_END
-
-    def _multiplicity_indicator(self, prop):
-        if prop.uselist:
-            return '+'
-        if hasattr(prop, 'local_side'):
-            cols = prop.local_side
-        else:
-            cols = prop.local_columns
-        if any(col.nullable for col in cols):
-            return '0..1 '
-        if self.show_multiplicity_one:
-            return '1 '
-        return ''
-
-    def _relationship_label(self, rel):
-        """Returns the relationship name with multiplicity indicator."""
-        return '  {}{}  '.format(
-            self._multiplicity_indicator(rel), self.renamer(rel.key))
-
     def graph(self, model_classes):
         graph = Dot(**self.graph_options)
         relations = set()
@@ -217,15 +146,87 @@ class ModelGrapher(Grapher):
             if len(relation) == 2:
                 src, dest = relation
                 between = src.parent, dest.parent
-                options['headlabel'] = self._relationship_label(src)
-                options['taillabel'] = self._relationship_label(dest)
+                options['headlabel'] = self._format_relationship(src)
+                options['taillabel'] = self._format_relationship(dest)
                 options['dir'] = 'both'
             else:
                 prop, = relation
                 between = prop.parent, prop.mapper
-                options['headlabel'] = self._relationship_label(prop)
+                options['headlabel'] = self._format_relationship(prop)
             graph.add_edge(Edge(map(self.quote, between), **options))
         return graph
+
+    def quote(self, mapper):
+        """Returns the quoted model name."""
+        return super(ModelGrapher, self).quote(mapper.class_.__name__)
+
+    def _model_columns(self, mapper):
+        if self.show_attributes:
+            yield NODE_BLOCK_START
+            for column in mapper.columns:
+                if self.show_inherited or column.table is mapper.tables[0]:
+                    yield self.node_row(self._column_label(column))
+            yield NODE_BLOCK_END
+
+    def _model_operations(self, mapper):
+        model = mapper.class_
+        operations = filter(self._is_local_class_method(model), vars(model))
+        if operations and self.show_operations:
+            yield NODE_BLOCK_START
+            for name in sorted(operations):
+                func = getattr(model, name)
+                oper = [self.renamer(name), self._format_argspec(func)]
+                if not isinstance(func, MethodType):
+                    oper.insert(0, '*')  # Non-instancemethod indicator
+                yield self.node_row(oper)
+            yield NODE_BLOCK_END
+
+    def _column_label(self, column):
+        """Returns the column name with type if so configured."""
+        if self.show_datatypes:
+            return '{}: {}'.format(
+                *map(self.renamer, (column.name, type(column.type).__name__)))
+        return self.renamer(column.name)
+
+    def _format_argspec(self, function):
+        """Returns a formatted argument spec exluding a method's 'self'."""
+        argspec = list(getargspec(function))
+        if argspec[0][0] == 'self':
+            argspec[0].pop(0)
+        for index, content in enumerate(argspec):
+            if isinstance(content, (list, tuple)):
+                argspec[index] = map(self.renamer, content)
+            elif isinstance(content, str):
+                argspec[index] = self.renamer(content)
+        return formatargspec(*argspec)
+
+    def _format_multiplicity(self, prop):
+        """Returns a string with a multiplicity indicator."""
+        if prop.uselist:
+            return '+'
+        if hasattr(prop, 'local_side'):
+            cols = prop.local_side
+        else:
+            cols = prop.local_columns
+        if any(col.nullable for col in cols):
+            return '0..1 '
+        if self.show_multiplicity_one:
+            return '1 '
+        return ''
+
+    def _format_relationship(self, rel):
+        """Returns the relationship name with multiplicity prefix."""
+        return '  {}{}  '.format(
+            self._format_multiplicity(rel), self.renamer(rel.key))
+
+    @staticmethod
+    def _is_local_class_method(class_):
+        """Test whether attr name is a method defined on the provided class."""
+        def _checker(attribute):
+            obj = getattr(class_, attribute)
+            return (isinstance(obj, (FunctionType, MethodType)) and
+                    obj.__module__ is class_.__module__)
+        return _checker
 
 
 class TableGrapher(Grapher):
