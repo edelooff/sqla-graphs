@@ -6,8 +6,8 @@ Base = declarative_base()
 T_PARENT_CHILD = Table(
     'parent_child',
     Base.metadata,
-    Column('parent_id', Integer, ForeignKey('parent.id')),
-    Column('child_id', Integer, ForeignKey('child.id')))
+    Column('parent_id', Integer, ForeignKey('parent.id'), primary_key=True),
+    Column('child_id', Integer, ForeignKey('child.id'), primary_key=True))
 
 
 class Parent(Base):
