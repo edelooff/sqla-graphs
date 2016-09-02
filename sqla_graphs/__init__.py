@@ -10,6 +10,7 @@ from pydot import (
     Dot,
     Edge,
     Node)
+from sqlalchemy.orm import class_mapper
 from sqlalchemy.orm.properties import RelationshipProperty
 
 
@@ -174,7 +175,7 @@ class ModelGrapher(Grapher):
         return '  {}{}  '.format(
             self._multiplicity_indicator(rel), self.renamer(rel.key))
 
-    def graph(self, mappers):
+    def graph(self, model_classes):
         graph = Dot(**self.graph_options)
         relations = set()
 
@@ -183,6 +184,7 @@ class ModelGrapher(Grapher):
             return '"{}"'.format(obj.class_.__name__)
 
         # Create nodes from mappers
+        mappers = map(class_mapper, model_classes)
         for mapper in mappers:
             graph.add_node(Node(
                 class_name(mapper),
