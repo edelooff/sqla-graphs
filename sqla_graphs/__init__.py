@@ -1,3 +1,4 @@
+import itertools
 from inspect import (
     formatargspec,
     getargspec)
@@ -12,12 +13,12 @@ from pydot import (
 from sqlalchemy.orm.properties import RelationshipProperty
 
 
-NODE_TABLE_START = (
-    '<TABLE BORDER="0" CELLBORDER="1" CELLPADDING="1" CELLSPACING="0">'
+NODE_TABLE = (
+    '<<TABLE BORDER="0" CELLBORDER="1" CELLPADDING="1" CELLSPACING="0">'
     '<TR><TD BGCOLOR="{bgcolor}" VALIGN="BOTTOM">'
     '<FONT POINT-SIZE="{top_margin}"><BR ALIGN="LEFT" /></FONT>'
     '<FONT COLOR="{color}" POINT-SIZE="{fontsize}"><B>{title}</B></FONT>'
-    '</TD></TR>')
+    '</TD></TR>{table_content}</TABLE>>')
 NODE_BLOCK_START = '<TR><TD><TABLE BORDER="0" CELLSPACING="0" CELLPADDING="1">'
 NODE_BLOCK_END = '</TABLE></TD></TR>'
 DEFAULT_STYLE = {
@@ -60,14 +61,6 @@ def calculate_style(style):
         'node_table_header': collapse('node_table_header')}
 
 
-def node_row(content, port=''):
-    """Renders a content row for a node table."""
-    if isinstance(content, (list, tuple)):
-        content = ''.join(content)
-    return '<TR><TD ALIGN="LEFT" PORT="{port}">{content}</TD></TR>'.format(
-        port=port, content=content)
-
-
 class Grapher(object):
     GRAPH_OPTIONS = {}
 
@@ -77,6 +70,21 @@ class Grapher(object):
             self.graph_options.update(graph_options)
         self.renamer = name_mangler or (lambda obj: obj)
         self.style = calculate_style(style or {})
+
+    @staticmethod
+    def node_row(content, port=''):
+        """Renders a content row for a node table."""
+        if isinstance(content, (list, tuple)):
+            content = ''.join(content)
+        return '<TR><TD ALIGN="LEFT" PORT="{port}">{content}</TD></TR>'.format(
+            port=port, content=content)
+
+    def node_table(self, title, *content_iterators):
+        """Returns an HTML table label for a Node."""
+        return NODE_TABLE.format(
+            table_content=''.join(itertools.chain(*content_iterators)),
+            title=self.renamer(title),
+            **self.style['node_table_header'])
 
 
 class ModelGrapher(Grapher):
@@ -127,33 +135,26 @@ class ModelGrapher(Grapher):
                     obj.__module__ is class_.__module__)
         return _checker
 
-    def _model_label(self, mapper):
-        model = mapper.class_
-        html = [NODE_TABLE_START.format(
-            title=self.renamer(model.__name__),
-            **self.style['node_table_header'])]
-
-        # Column attributes
+    def _model_columns(self, mapper):
         if self.show_attributes:
-            html.append(NODE_BLOCK_START)
+            yield NODE_BLOCK_START
             for column in mapper.columns:
                 if self.show_inherited or column.table is mapper.tables[0]:
-                    html.append(node_row(self._column_label(column)))
-            html.append(NODE_BLOCK_END)
+                    yield self.node_row(self._column_label(column))
+            yield NODE_BLOCK_END
 
-        # Model methods
-        if self.show_operations:
-            operations = filter(self.is_local_class_method(model), vars(model))
-            if operations:
-                html.append(NODE_BLOCK_START)
-                for name in sorted(operations):
-                    func = getattr(model, name)
-                    oper = [self.renamer(name), self._formatted_argspec(func)]
-                    if not isinstance(func, MethodType):
-                        oper.insert(0, '*')  # Non-instancemethod indicator
-                    html.append(node_row(oper))
-                html.append(NODE_BLOCK_END)
-        return '<{}</TABLE>>'.format(''.join(html))
+    def _model_operations(self, mapper):
+        model = mapper.class_
+        operations = filter(self.is_local_class_method(model), vars(model))
+        if operations and self.show_operations:
+            yield NODE_BLOCK_START
+            for name in sorted(operations):
+                func = getattr(model, name)
+                oper = [self.renamer(name), self._formatted_argspec(func)]
+                if not isinstance(func, MethodType):
+                    oper.insert(0, '*')  # Non-instancemethod indicator
+                yield self.node_row(oper)
+            yield NODE_BLOCK_END
 
     def _multiplicity_indicator(self, prop):
         if prop.uselist:
@@ -185,7 +186,10 @@ class ModelGrapher(Grapher):
         for mapper in mappers:
             graph.add_node(Node(
                 class_name(mapper),
-                label=self._model_label(mapper),
+                label=self.node_table(
+                    mapper.class_.__name__,
+                    self._model_columns(mapper),
+                    self._model_operations(mapper)),
                 **self.style['node']))
             if mapper.inherits:
                 between = class_name(mapper.inherits), class_name(mapper)
@@ -241,7 +245,10 @@ class TableGrapher(Grapher):
 
             graph.add_node(Node(
                 table.name,
-                label=self._table_label(table),
+                label=self.node_table(
+                    table.name,
+                    self._table_columns(table),
+                    self._table_indices(table)),
                 **self.style['node']))
 
             for fk in table.foreign_keys:
@@ -266,28 +273,22 @@ class TableGrapher(Grapher):
                 graph.add_edge(Edge(*edge, **options))
         return graph
 
-    def _table_label(self, table):
-        html = [NODE_TABLE_START.format(
-            title=self.renamer(table.name),
-            **self.style['node_table_header'])]
-
-        # Columns
-        html.append(NODE_BLOCK_START)
+    def _table_columns(self, table):
+        yield (NODE_BLOCK_START)
         for col in table.columns:
-            html.append(node_row(self._format_column(col), port=col.name))
-        html.append(NODE_BLOCK_END)
+            yield self.node_row(self._format_column(col), port=col.name)
+        yield (NODE_BLOCK_END)
 
-        # Indexes
+    def _table_indices(self, table):
         if self.show_indexes and (table.indexes or table.primary_key):
-            html.append(NODE_BLOCK_START)
+            yield NODE_BLOCK_START
             if table.primary_key:
-                html.append(node_row(self._format_index(
-                    'PRIMARY', table.primary_key.columns)))
+                yield self.node_row(self._format_index(
+                    'PRIMARY', table.primary_key.columns))
             for index in table.indexes:
-                html.append(node_row(self._format_index(
-                    'UNIQUE' if index.unique else 'INDEX', index.columns)))
-            html.append(NODE_BLOCK_END)
-        return '<{}</TABLE>>'.format(''.join(html))
+                yield self.node_row(self._format_index(
+                    'UNIQUE' if index.unique else 'INDEX', index.columns))
+            yield NODE_BLOCK_END
 
     def _format_column(self, col):
         if self.show_datatypes:
