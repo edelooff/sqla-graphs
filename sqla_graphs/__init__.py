@@ -87,6 +87,11 @@ class Grapher(object):
             title=self.renamer(title),
             **self.style['node_table_header'])
 
+    @staticmethod
+    def quote(name):
+        """Returns the name in quotes, preventing reserved keyword issues."""
+        return '"{}"'.format(name)
+
 
 class ModelGrapher(Grapher):
     GRAPH_OPTIONS = {'mclimit': 1000}
@@ -107,6 +112,10 @@ class ModelGrapher(Grapher):
         self.show_inherited = show_inherited
         self.show_operations = show_operations
         self.show_multiplicity_one = show_multiplicity_one
+
+    def quote(self, mapper):
+        """Returns the quoted model name."""
+        return super(ModelGrapher, self).quote(mapper.class_.__name__)
 
     def _column_label(self, column):
         """Returns the column name with type if so configured."""
@@ -179,23 +188,20 @@ class ModelGrapher(Grapher):
         graph = Dot(**self.graph_options)
         relations = set()
 
-        def class_name(obj):
-            """Returns a quoted string of the name of the mapped class."""
-            return '"{}"'.format(obj.class_.__name__)
-
         # Create nodes from mappers
         mappers = map(class_mapper, model_classes)
         for mapper in mappers:
             graph.add_node(Node(
-                class_name(mapper),
+                self.quote(mapper),
                 label=self.node_table(
                     mapper.class_.__name__,
                     self._model_columns(mapper),
                     self._model_operations(mapper)),
                 **self.style['node']))
             if mapper.inherits:
-                between = class_name(mapper.inherits), class_name(mapper)
-                graph.add_edge(Edge(*between, **self.style['inheritance']))
+                graph.add_edge(Edge(
+                    map(self.quote, (mapper.inherits, mapper)),
+                    **self.style['inheritance']))
             for loader in mapper.iterate_properties:
                 if (isinstance(loader, RelationshipProperty) and
                         loader.mapper in mappers):
@@ -210,15 +216,15 @@ class ModelGrapher(Grapher):
             options = self.style['relationship'].copy()
             if len(relation) == 2:
                 src, dest = relation
-                between = class_name(src.parent), class_name(dest.parent)
+                between = src.parent, dest.parent
                 options['headlabel'] = self._relationship_label(src)
                 options['taillabel'] = self._relationship_label(dest)
                 options['dir'] = 'both'
             else:
                 prop, = relation
-                between = class_name(prop.parent), class_name(prop.mapper)
+                between = prop.parent, prop.mapper
                 options['headlabel'] = self._relationship_label(prop)
-            graph.add_edge(Edge(*between, **options))
+            graph.add_edge(Edge(map(self.quote, between), **options))
         return graph
 
 
@@ -246,13 +252,12 @@ class TableGrapher(Grapher):
                 continue
 
             graph.add_node(Node(
-                table.name,
+                self.quote(table.name),
                 label=self.node_table(
                     table.name,
                     self._table_columns(table),
                     self._table_indices(table)),
                 **self.style['node']))
-
             for fk in table.foreign_keys:
                 fk_table = fk.column.table
                 if fk_table not in tables or fk_table.name in skip_tables:
@@ -272,7 +277,7 @@ class TableGrapher(Grapher):
                     options['arrowhead'] = 'odot'
                     options['tailport'] = fk.parent.name
                     options['headport'] = fk.column.name
-                graph.add_edge(Edge(*edge, **options))
+                graph.add_edge(Edge(map(self.quote, edge), **options))
         return graph
 
     def _table_columns(self, table):
