@@ -52,7 +52,6 @@ def calculate_style(style):
             result.update(style.get(key, {}))
         return result
 
-    style = style if style is not None else {}
     return {
         'edge': collapse('edge'),
         'inheritance': collapse('edge', 'inheritance'),
@@ -69,7 +68,18 @@ def node_row(content, port=''):
         port=port, content=content)
 
 
-class ModelGrapher(object):
+class Grapher(object):
+    GRAPH_OPTIONS = {}
+
+    def __init__(self, graph_options, name_mangler, style):
+        self.graph_options = self.GRAPH_OPTIONS.copy()
+        if graph_options is not None:
+            self.graph_options.update(graph_options)
+        self.renamer = name_mangler or (lambda obj: obj)
+        self.style = calculate_style(style or {})
+
+
+class ModelGrapher(Grapher):
     GRAPH_OPTIONS = {'mclimit': 1000}
 
     def __init__(
@@ -82,16 +92,12 @@ class ModelGrapher(object):
             graph_options=None,
             name_mangler=None,
             style=None):
+        super(ModelGrapher, self).__init__(graph_options, name_mangler, style)
         self.show_attributes = show_attributes
         self.show_datatypes = show_datatypes
         self.show_inherited = show_inherited
         self.show_operations = show_operations
         self.show_multiplicity_one = show_multiplicity_one
-        self.graph_options = self.GRAPH_OPTIONS.copy()
-        if graph_options is not None:
-            self.graph_options.update(graph_options)
-        self.renamer = name_mangler or (lambda obj: obj)
-        self.style = calculate_style(style)
 
     def _column_label(self, column):
         """Returns the column name with type if so configured."""
@@ -210,7 +216,7 @@ class ModelGrapher(object):
         return graph
 
 
-class TableGrapher(object):
+class TableGrapher(Grapher):
     GRAPH_OPTIONS = {
         'concentrate': 'true',
         'mclimit': 1000,
@@ -223,13 +229,9 @@ class TableGrapher(object):
             graph_options=None,
             name_mangler=None,
             style=None):
+        super(TableGrapher, self).__init__(graph_options, name_mangler, style)
         self.show_datatypes = show_datatypes
         self.show_indexes = show_indexes
-        self.graph_options = self.GRAPH_OPTIONS.copy()
-        if graph_options is not None:
-            self.graph_options.update(graph_options)
-        self.renamer = name_mangler or (lambda obj: obj)
-        self.style = calculate_style(style)
 
     def graph(self, tables, skip_tables=()):
         graph = Dot(**self.graph_options)
