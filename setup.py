@@ -10,7 +10,7 @@ def contents(filename):
 
 setup(
     name='sqla-graphs',
-    version='0.1',
+    version='0.2',
     author='Elmer de Looff',
     author_email='elmer.delooff@gmail.com',
     description='Graphviz generators for SQLAlchemy models or databeses.',
