@@ -50,7 +50,7 @@ Installation
 
 Lacking a PyPI distribution, the installation steps are below. They clone
 the repository, set up and activate a `virtualenv`_ and install the package
-into this fresh environment::
+into this fresh environment:
 
 .. code-block:: bash
 
