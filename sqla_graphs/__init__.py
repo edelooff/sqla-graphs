@@ -24,7 +24,7 @@ NODE_BLOCK_START = '<TR><TD><TABLE BORDER="0" CELLSPACING="0" CELLPADDING="1">'
 NODE_BLOCK_END = '</TABLE></TD></TR>'
 DEFAULT_STYLE = {
     'edge': {
-        'arrowsize': 0.6,
+        'arrowsize': 0.8,
         'fontname': 'Bitstream Vera Sans',
         'fontsize': 8,
         'labelfloat': 'true',
@@ -35,6 +35,8 @@ DEFAULT_STYLE = {
     'relationship': {
         'arrowhead': 'vee',
         'arrowtail': 'vee'},
+    'relationship-viewonly': {
+        'style': 'dashed'},
     'node': {
         'fontname': 'Bitstream Vera Sans',
         'fontsize': 8,
@@ -58,6 +60,7 @@ def calculate_style(style):
         'edge': collapse('edge'),
         'inheritance': collapse('edge', 'inheritance'),
         'relationship': collapse('edge', 'relationship'),
+        'relationship-viewonly': collapse('relationship-viewonly'),
         'node': collapse('node'),
         'node_table_header': collapse('node_table_header')}
 
@@ -145,6 +148,8 @@ class ModelGrapher(Grapher):
             options = self.style['relationship'].copy()
             if len(relation) == 2:
                 src, dest = relation
+                if src.viewonly and dest.viewonly:
+                    options.update(self.style['relationship-viewonly'])
                 between = src.parent, dest.parent
                 options['headlabel'] = self._format_relationship(src)
                 options['taillabel'] = self._format_relationship(dest)
@@ -153,6 +158,8 @@ class ModelGrapher(Grapher):
                 prop, = relation
                 between = prop.parent, prop.mapper
                 options['headlabel'] = self._format_relationship(prop)
+                if prop.viewonly:
+                    options.update(self.style['relationship-viewonly'])
             graph.add_edge(Edge(map(self.quote, between), **options))
         return graph
 
