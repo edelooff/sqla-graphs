@@ -7,6 +7,8 @@ from sqlalchemy.exc import CompileError
 from sqlalchemy.orm import class_mapper
 from sqlalchemy.orm.properties import RelationshipProperty
 
+__version__ = "0.3"
+
 NODE_TABLE = (
     '<<TABLE BORDER="0" CELLBORDER="1" CELLPADDING="1" CELLSPACING="0">'
     '<TR><TD BGCOLOR="{bgcolor}" VALIGN="BOTTOM">'
