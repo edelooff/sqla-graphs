@@ -3,6 +3,7 @@ from inspect import formatargspec, getargspec
 from types import FunctionType, MethodType
 
 from pydot import Dot, Edge, Node
+from sqlalchemy.exc import CompileError
 from sqlalchemy.orm import class_mapper
 from sqlalchemy.orm.properties import RelationshipProperty
 
@@ -113,7 +114,7 @@ class ModelGrapher(Grapher):
         relations = set()
 
         # Create nodes from mappers
-        mappers = map(class_mapper, model_classes)
+        mappers = list(map(class_mapper, model_classes))
         for mapper in mappers:
             graph.add_node(
                 Node(
@@ -318,7 +319,11 @@ class TableGrapher(Grapher):
 
     def _format_column(self, col):
         if self.show_datatypes:
-            return "{}: {}".format(*map(self.renamer, (col.name, str(col.type))))
+            try:
+                coltype = str(col.type)
+            except CompileError:
+                coltype = "&lt;Unknown type&gt;"
+            return "{}: {}".format(*map(self.renamer, (col.name, coltype)))
         return self.renamer(col.name)
 
     def _format_index(self, idx_type, cols):
