@@ -179,7 +179,7 @@ class ModelGrapher(Grapher):
 
     def _model_operations(self, mapper):
         model = mapper.class_
-        operations = filter(self._is_local_class_method(model), vars(model))
+        operations = list(filter(self._is_local_class_method(model), vars(model)))
         if operations and self.show_operations:
             yield NODE_BLOCK_START
             for name in sorted(operations):
