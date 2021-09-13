@@ -4,7 +4,6 @@ from types import FunctionType, MethodType
 
 from pydot import Dot, Edge, Node
 from sqlalchemy.orm import class_mapper
-from sqlalchemy.orm.exc import UnmappedClassError
 from sqlalchemy.orm.properties import RelationshipProperty
 
 NODE_TABLE = (
@@ -130,7 +129,7 @@ class ModelGrapher(Grapher):
             if mapper.inherits:
                 graph.add_edge(
                     Edge(
-                        *list(map(self.quote, (mapper.inherits, mapper))),
+                        *map(self.quote, (mapper.inherits, mapper)),
                         **self.style["inheritance"]
                     )
                 )
@@ -162,7 +161,7 @@ class ModelGrapher(Grapher):
                 options["headlabel"] = self._format_relationship(prop)
                 if prop.viewonly:
                     options.update(self.style["relationship-viewonly"])
-            graph.add_edge(Edge(*list(map(self.quote, between)), **options))
+            graph.add_edge(Edge(*map(self.quote, between), **options))
         return graph
 
     def quote(self, mapper):
@@ -194,7 +193,7 @@ class ModelGrapher(Grapher):
         """Returns the column name with type if so configured."""
         if self.show_datatypes:
             return "{}: {}".format(
-                *list(map(self.renamer, (column.name, type(column.type).__name__)))
+                *map(self.renamer, (column.name, type(column.type).__name__))
             )
         return self.renamer(column.name)
 
@@ -293,7 +292,7 @@ class TableGrapher(Grapher):
                     options["arrowhead"] = "odot"
                     options["tailport"] = fk.parent.name
                     options["headport"] = fk.column.name
-                graph.add_edge(Edge(*list(map(self.quote, edge)), **options))
+                graph.add_edge(Edge(*map(self.quote, edge), **options))
         return graph
 
     def _table_columns(self, table):
@@ -319,7 +318,7 @@ class TableGrapher(Grapher):
 
     def _format_column(self, col):
         if self.show_datatypes:
-            return "{}: {}".format(*list(map(self.renamer, (col.name, str(col.type)))))
+            return "{}: {}".format(*map(self.renamer, (col.name, str(col.type))))
         return self.renamer(col.name)
 
     def _format_index(self, idx_type, cols):
