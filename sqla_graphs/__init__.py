@@ -72,22 +72,20 @@ class Grapher(object):
         """Renders a content row for a node table."""
         if isinstance(content, (list, tuple)):
             content = "".join(content)
-        return '<TR><TD ALIGN="LEFT" PORT="{port}">{content}</TD></TR>'.format(
-            port=port, content=content
-        )
+        return f"<TR><TD ALIGN='LEFT' PORT='{port}'>{content}</TD></TR>"
 
     def node_table(self, title, *content_iterators):
         """Returns an HTML table label for a Node."""
         return NODE_TABLE.format(
             table_content="".join(itertools.chain(*content_iterators)),
             title=self.renamer(title),
-            **self.style["node_table_header"]
+            **self.style["node_table_header"],
         )
 
     @staticmethod
     def quote(name):
         """Returns the name in quotes, preventing reserved keyword issues."""
-        return '"{}"'.format(name)
+        return f"{name!r}"
 
 
 class ModelGrapher(Grapher):
@@ -126,14 +124,14 @@ class ModelGrapher(Grapher):
                         self._model_columns(mapper),
                         self._model_operations(mapper),
                     ),
-                    **self.style["node"]
+                    **self.style["node"],
                 )
             )
             if mapper.inherits:
                 graph.add_edge(
                     Edge(
                         *map(self.quote, (mapper.inherits, mapper)),
-                        **self.style["inheritance"]
+                        **self.style["inheritance"],
                     )
                 )
             for loader in mapper.iterate_properties:
@@ -194,11 +192,11 @@ class ModelGrapher(Grapher):
 
     def _column_label(self, column):
         """Returns the column name with type if so configured."""
+        column_name = self.renamer(column.name)
         if self.show_datatypes:
-            return "{}: {}".format(
-                *map(self.renamer, (column.name, type(column.type).__name__))
-            )
-        return self.renamer(column.name)
+            column_type = self.renamer(type(column.type).__name__)
+            return f"{column_name}: {column_type}"
+        return column_name
 
     def _format_argspec(self, function):
         """Returns a formatted argument spec exluding a method's 'self'."""
@@ -228,7 +226,7 @@ class ModelGrapher(Grapher):
 
     def _format_relationship(self, rel):
         """Returns the relationship name with multiplicity prefix."""
-        return "  {}{}  ".format(self._format_multiplicity(rel), self.renamer(rel.key))
+        return f"  {self._format_multiplicity(rel)}{self.renamer(rel.key)}  "
 
     @staticmethod
     def _is_local_class_method(class_):
@@ -273,7 +271,7 @@ class TableGrapher(Grapher):
                         self._table_columns(table),
                         self._table_indices(table),
                     ),
-                    **self.style["node"]
+                    **self.style["node"],
                 )
             )
             for fk in table.foreign_keys:
@@ -299,10 +297,10 @@ class TableGrapher(Grapher):
         return graph
 
     def _table_columns(self, table):
-        yield (NODE_BLOCK_START)
+        yield NODE_BLOCK_START
         for col in table.columns:
             yield self.node_row(self._format_column(col), port=col.name)
-        yield (NODE_BLOCK_END)
+        yield NODE_BLOCK_END
 
     def _table_indices(self, table):
         if self.show_indexes and (table.indexes or table.primary_key):
@@ -312,23 +310,19 @@ class TableGrapher(Grapher):
                     self._format_index("PRIMARY", table.primary_key.columns)
                 )
             for index in table.indexes:
-                yield self.node_row(
-                    self._format_index(
-                        "UNIQUE" if index.unique else "INDEX", index.columns
-                    )
-                )
+                index_type = "UNIQUE" if index.unique else "INDEX"
+                yield self.node_row(self._format_index(index_type, index.columns))
             yield NODE_BLOCK_END
 
-    def _format_column(self, col):
+    def _format_column(self, column):
         if self.show_datatypes:
             try:
-                coltype = str(col.type)
+                column_type = str(column.type)
             except CompileError:
-                coltype = "&lt;Unknown type&gt;"
-            return "{}: {}".format(*map(self.renamer, (col.name, coltype)))
-        return self.renamer(col.name)
+                column_type = "&lt;Unknown type&gt;"
+            return f"{self.renamer(column.name)}: {self.renamer(column_type)}"
+        return self.renamer(column.name)
 
-    def _format_index(self, idx_type, cols):
-        return "{} ({})".format(
-            idx_type, ", ".join(self.renamer(col.name) for col in cols)
-        )
+    def _format_index(self, index_type, columns):
+        column_names = (self.renamer(col.name) for col in columns)
+        return f"{index_type} ({', '.join(column_names)})"
