@@ -1,18 +1,11 @@
 import itertools
-from inspect import (
-    formatargspec,
-    getargspec)
-from types import (
-    FunctionType,
-    MethodType)
+from inspect import formatargspec, getargspec
+from types import FunctionType, MethodType
 
-from pydot import (
-    Dot,
-    Edge,
-    Node)
+from pydot import Dot, Edge, Node
 from sqlalchemy.orm import class_mapper
+from sqlalchemy.orm.exc import UnmappedClassError
 from sqlalchemy.orm.properties import RelationshipProperty
-
 
 NODE_TABLE = (
     '<<TABLE BORDER="0" CELLBORDER="1" CELLPADDING="1" CELLSPACING="0">'
@@ -132,7 +125,7 @@ class ModelGrapher(Grapher):
                 **self.style['node']))
             if mapper.inherits:
                 graph.add_edge(Edge(
-                    map(self.quote, (mapper.inherits, mapper)),
+                    *list(map(self.quote, (mapper.inherits, mapper))),
                     **self.style['inheritance']))
             for loader in mapper.iterate_properties:
                 if (isinstance(loader, RelationshipProperty) and
@@ -160,7 +153,7 @@ class ModelGrapher(Grapher):
                 options['headlabel'] = self._format_relationship(prop)
                 if prop.viewonly:
                     options.update(self.style['relationship-viewonly'])
-            graph.add_edge(Edge(map(self.quote, between), **options))
+            graph.add_edge(Edge(*list(map(self.quote, between)), **options))
         return graph
 
     def quote(self, mapper):
@@ -192,7 +185,7 @@ class ModelGrapher(Grapher):
         """Returns the column name with type if so configured."""
         if self.show_datatypes:
             return '{}: {}'.format(
-                *map(self.renamer, (column.name, type(column.type).__name__)))
+                *list(map(self.renamer, (column.name, type(column.type).__name__))))
         return self.renamer(column.name)
 
     def _format_argspec(self, function):
@@ -202,7 +195,7 @@ class ModelGrapher(Grapher):
             argspec[0].pop(0)
         for index, content in enumerate(argspec):
             if isinstance(content, (list, tuple)):
-                argspec[index] = map(self.renamer, content)
+                argspec[index] = list(map(self.renamer, content))
             elif isinstance(content, str):
                 argspec[index] = self.renamer(content)
         return formatargspec(*argspec)
@@ -285,7 +278,7 @@ class TableGrapher(Grapher):
                     options['arrowhead'] = 'odot'
                     options['tailport'] = fk.parent.name
                     options['headport'] = fk.column.name
-                graph.add_edge(Edge(map(self.quote, edge), **options))
+                graph.add_edge(Edge(*list(map(self.quote, edge)), **options))
         return graph
 
     def _table_columns(self, table):
@@ -308,7 +301,7 @@ class TableGrapher(Grapher):
     def _format_column(self, col):
         if self.show_datatypes:
             return '{}: {}'.format(
-                *map(self.renamer, (col.name, str(col.type))))
+                *list(map(self.renamer, (col.name, str(col.type)))))
         return self.renamer(col.name)
 
     def _format_index(self, idx_type, cols):
