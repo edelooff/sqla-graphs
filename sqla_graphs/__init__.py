@@ -1,5 +1,5 @@
 import itertools
-from inspect import formatargspec, getargspec
+from inspect import Signature
 from types import FunctionType, MethodType
 
 from pydot import Dot, Edge, Node
@@ -184,7 +184,7 @@ class ModelGrapher(Grapher):
             yield NODE_BLOCK_START
             for name in sorted(operations):
                 func = getattr(model, name)
-                oper = [self.renamer(name), self._format_argspec(func)]
+                oper = [self.renamer(name), self._format_signature(func)]
                 if not isinstance(func, MethodType):
                     oper.insert(0, "*")  # Non-instancemethod indicator
                 yield self.node_row(oper)
@@ -197,18 +197,6 @@ class ModelGrapher(Grapher):
             column_type = self.renamer(type(column.type).__name__)
             return f"{column_name}: {column_type}"
         return column_name
-
-    def _format_argspec(self, function):
-        """Returns a formatted argument spec exluding a method's 'self'."""
-        argspec = list(getargspec(function))
-        if argspec[0][0] == "self":
-            argspec[0].pop(0)
-        for index, content in enumerate(argspec):
-            if isinstance(content, (list, tuple)):
-                argspec[index] = list(map(self.renamer, content))
-            elif isinstance(content, str):
-                argspec[index] = self.renamer(content)
-        return formatargspec(*argspec)
 
     def _format_multiplicity(self, prop):
         """Returns a string with a multiplicity indicator."""
@@ -227,6 +215,19 @@ class ModelGrapher(Grapher):
     def _format_relationship(self, rel):
         """Returns the relationship name with multiplicity prefix."""
         return f"  {self._format_multiplicity(rel)}{self.renamer(rel.key)}  "
+
+    def _format_signature(self, function):
+        """Returns a formatted call signature exluding a method's 'self'.
+
+        Other parameter names are renamed according to the instance's `renamer`.
+        """
+
+        def _param_iter(sig):
+            for param in sig.parameters.values():
+                if param.name != "self":
+                    yield param.replace(name=self.renamer(param.name))
+
+        return str(Signature(_param_iter(Signature.from_callable(function))))
 
     @staticmethod
     def _is_local_class_method(class_):
